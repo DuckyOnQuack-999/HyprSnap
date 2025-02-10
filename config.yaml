@@ -1,0 +1,35 @@
+# HyprSnap Configuration File
+
+# Directory settings
+save_directory: "~/Pictures/Screenshots"
+gif_directory: "~/Pictures/Recordings"
+
+# Recording settings
+default_fps: 15
+default_quality: 80
+optimize_by_default: false
+
+# Hotkeys (using Hyprland syntax)
+hotkeys:
+  record: "SUPER+SHIFT+R"
+  screenshot_full: "SUPER+SHIFT+S"
+  screenshot_area: "SUPER+SHIFT+A"
+  screenshot_window: "SUPER+SHIFT+W"
+
+# Notification settings
+notifications:
+  enabled: true
+  timeout: 5000  # milliseconds
+  sound: true
+
+# Performance settings
+performance:
+  max_threads: 4
+  temp_directory: "/tmp/hyprsnap"
+  cleanup_older_than: 24  # hours
+
+# Debug settings
+debug:
+  enabled: false
+  log_level: "info"  # debug, info, warn, error
+  log_file: "~/.local/share/hyprsnap/hyprsnap.log" 

@@ -1,0 +1,44 @@
+# Temporary files
+/tmp/
+*.tmp
+*.temp
+*.swp
+*~
+
+# Debug logs
+*.log
+debug/
+logs/
+
+# Build output
+/build/
+/dist/
+*.o
+*.out
+
+# IDE and editor files
+.vscode/
+.idea/
+*.sublime-*
+*.code-workspace
+
+# OS-specific files
+.DS_Store
+.directory
+Thumbs.db
+
+# Project-specific
+/Pictures/
+/Screenshots/
+/Recordings/
+*.gif
+!docs/images/*.gif
+
+# Config backups
+*.bak
+*.old
+config.yaml.bak
+
+# Test files
+/tests/temp/
+/tests/coverage/ 
