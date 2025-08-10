@@ -1,0 +1,29 @@
+{
+  "changeset_id": "fix-001-formatter-invocation",
+  "timestamp": "2025-01-10T20:45:00Z",
+  "confidence": 0.95,
+  "category": "python_fixes",
+  "description": "Fix Python formatter invocation mismatch and initialize sections",
+  "files_modified": [
+    {
+      "path": "src/core/formatter.py",
+      "lines_changed": [51, 69, 273, 288],
+      "change_type": "method_rename_and_enhancement",
+      "reason": "hyprsnap_process.py calls formatter.format_output(...) but class defines format(...). Added format_output method with proper section initialization and kept format as backward-compatible alias."
+    }
+  ],
+  "issues_addressed": [
+    "Method invocation mismatch between processor and formatter",
+    "Dynamic sections (toc, changelog, semantic_map, etc.) not initialized before formatting",
+    "Issues and completions formatting lacked structure and line numbers"
+  ],
+  "improvements": [
+    "Added format_output method that properly initializes all dynamic sections",
+    "Maintained backward compatibility with format method as alias",
+    "Enhanced issue formatting with categorized buckets and line numbers",
+    "Improved completion formatting with line number references"
+  ],
+  "risk_assessment": "low",
+  "testing_required": true,
+  "rollback_notes": "Can revert by removing format_output method and restoring original format method"
+}
