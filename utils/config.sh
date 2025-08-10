@@ -26,6 +26,41 @@ declare -A DEFAULT_CONFIG=(
 # Configuration file path
 CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/hyprsnap/config.yaml"
 
+# Check for required binaries
+check_dependencies() {
+    local missing_deps=()
+    
+    # Core tools
+    command -v grim >/dev/null || missing_deps+=("grim")
+    command -v slurp >/dev/null || missing_deps+=("slurp")
+    command -v wf-recorder >/dev/null || missing_deps+=("wf-recorder")
+    command -v ffmpeg >/dev/null || missing_deps+=("ffmpeg")
+    command -v convert >/dev/null || missing_deps+=("imagemagick")
+    
+    # YAML parser
+    if ! command -v yq >/dev/null; then
+        if ! command -v jq >/dev/null; then
+            missing_deps+=("yq or jq")
+        fi
+    fi
+    
+    # Optional optimization tools
+    if [[ $OPTIMIZE_BY_DEFAULT == "true" ]]; then
+        command -v optipng >/dev/null || missing_deps+=("optipng (optional)")
+        command -v jpegoptim >/dev/null || missing_deps+=("jpegoptim (optional)")
+        command -v cwebp >/dev/null || missing_deps+=("libwebp/cwebp (optional)")
+    fi
+    
+    if [[ ${#missing_deps[@]} -gt 0 ]]; then
+        handle_error 1 "Missing dependencies: ${missing_deps[*]}" "WARNING"
+        log_message "INFO" "Install missing dependencies:"
+        log_message "INFO" "Arch: sudo pacman -S grim slurp wf-recorder ffmpeg imagemagick yq optipng jpegoptim libwebp"
+        log_message "INFO" "Ubuntu: sudo apt install grim slurp wf-recorder ffmpeg imagemagick-6.q16 yq optipng jpegoptim webp"
+    fi
+    
+    return 0
+}
+
 # Validate configuration values
 validate_config() {
     local config_file=$1
@@ -34,31 +69,37 @@ validate_config() {
     if [[ ! -f "$config_file" ]]; then
         handle_error 1 "Configuration file not found: $config_file" "ERROR"
         return 1
-    }
+    fi
     
-    # Validate FPS
-    local fps=$(yq e '.default_fps' "$config_file")
+    # Check yq availability
+    if ! command -v yq >/dev/null; then
+        handle_error 1 "yq command not found. Please install yq to parse YAML config files" "ERROR"
+        return 1
+    fi
+    
+    # Validate FPS (with fallbacks)
+    local fps=$(yq e '.default_fps // 15' "$config_file")
     if ! [[ "$fps" =~ ^[0-9]+$ ]] || ((10#$fps < 1)) || ((10#$fps > 60)); then
         handle_error 1 "Invalid FPS value: $fps" "ERROR"
         return 1
     fi
     
-    # Validate quality
-    local quality=$(yq e '.default_quality' "$config_file")
+    # Validate quality (with fallbacks)
+    local quality=$(yq e '.default_quality // 80' "$config_file")
     if ! [[ "$quality" =~ ^[0-9]+$ ]] || ((10#$quality < 1)) || ((10#$quality > 100)); then
         handle_error 1 "Invalid quality value: $quality" "ERROR"
         return 1
     fi
     
-    # Validate screenshot format
-    local format=$(yq e '.screenshot_format' "$config_file")
+    # Validate screenshot format (with fallbacks)
+    local format=$(yq e '.screenshot_format // .screenshot.format // "png"' "$config_file")
     if [[ ! "$format" =~ ^(png|jpg|webp)$ ]]; then
         handle_error 1 "Invalid screenshot format: $format" "ERROR"
         return 1
     fi
     
-    # Validate max threads
-    local threads=$(yq e '.max_threads' "$config_file")
+    # Validate max threads (with fallbacks)
+    local threads=$(yq e '.max_threads // .performance.max_threads // 4' "$config_file")
     if ! [[ "$threads" =~ ^[0-9]+$ ]] || ((10#$threads < 1)); then
         handle_error 1 "Invalid max_threads value: $threads" "ERROR"
         return 1
@@ -83,24 +124,40 @@ load_config() {
         return 1
     fi
     
-    # Load configuration values
-    DEFAULT_FPS=$(yq e '.default_fps' "$CONFIG_FILE")
-    DEFAULT_QUALITY=$(yq e '.default_quality' "$CONFIG_FILE")
-    SAVE_DIR=$(yq e '.save_directory' "$CONFIG_FILE")
-    GIF_DIR=$(yq e '.gif_directory' "$CONFIG_FILE")
-    VIDEO_DIR=$(yq e '.video_directory' "$CONFIG_FILE")
-    DEBUG_ENABLED=$(yq e '.debug_enabled' "$CONFIG_FILE")
-    NOTIFICATIONS_ENABLED=$(yq e '.notifications_enabled' "$CONFIG_FILE")
-    FFMPEG_CODEC=$(yq e '.ffmpeg_codec' "$CONFIG_FILE")
-    SCREENSHOT_FORMAT=$(yq e '.screenshot_format' "$CONFIG_FILE")
-    MAX_THREADS=$(yq e '.max_threads' "$CONFIG_FILE")
-    OPTIMIZE_BY_DEFAULT=$(yq e '.optimize_by_default' "$CONFIG_FILE")
-    CLEANUP_OLDER_THAN=$(yq e '.cleanup_older_than' "$CONFIG_FILE")
+    # Check dependencies after loading config
+    check_dependencies
+    
+    # Load configuration values with fallbacks to support both flat and nested structures
+    DEFAULT_FPS=$(yq e '.default_fps // 15' "$CONFIG_FILE")
+    DEFAULT_QUALITY=$(yq e '.default_quality // 80' "$CONFIG_FILE")
+    SAVE_DIR=$(yq e '.save_directory // "~/Pictures/HyprSnap"' "$CONFIG_FILE")
+    GIF_DIR=$(yq e '.gif_directory // "~/Pictures/HyprSnap/GIFs"' "$CONFIG_FILE")
+    VIDEO_DIR=$(yq e '.video_directory // "~/Pictures/HyprSnap/Videos"' "$CONFIG_FILE")
+    
+    # Debug settings - support both flat and nested structures
+    DEBUG_ENABLED=$(yq e '.debug_enabled // .debug.enabled // false' "$CONFIG_FILE")
+    
+    # Notification settings
+    NOTIFICATIONS_ENABLED=$(yq e '.notifications_enabled // .notifications.enabled // true' "$CONFIG_FILE")
+    
+    # FFmpeg settings
+    FFMPEG_CODEC=$(yq e '.ffmpeg_codec // .ffmpeg.codec // "libx264"' "$CONFIG_FILE")
+    
+    # Screenshot format - support both locations
+    SCREENSHOT_FORMAT=$(yq e '.screenshot_format // .screenshot.format // "png"' "$CONFIG_FILE")
+    
+    # Performance settings
+    MAX_THREADS=$(yq e '.max_threads // .performance.max_threads // 4' "$CONFIG_FILE")
+    TEMP_DIR=$(yq e '.temp_directory // .performance.temp_directory // "/tmp/hyprsnap"' "$CONFIG_FILE")
+    CLEANUP_OLDER_THAN=$(yq e '.cleanup_older_than // .performance.cleanup_older_than // 24' "$CONFIG_FILE")
+    
+    # Optimization setting
+    OPTIMIZE_BY_DEFAULT=$(yq e '.optimize_by_default // false' "$CONFIG_FILE")
     
     # Export variables
     export DEFAULT_FPS DEFAULT_QUALITY SAVE_DIR GIF_DIR VIDEO_DIR DEBUG_ENABLED
     export NOTIFICATIONS_ENABLED FFMPEG_CODEC SCREENSHOT_FORMAT MAX_THREADS
-    export OPTIMIZE_BY_DEFAULT CLEANUP_OLDER_THAN
+    export TEMP_DIR OPTIMIZE_BY_DEFAULT CLEANUP_OLDER_THAN
     
     return 0
 }
