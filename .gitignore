@@ -1,0 +1,177 @@
+# HyprSnap .gitignore
+# Created by DuckyOnQuack-999
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Temporary files
+*.tmp
+*.temp
+/tmp/
+.temp/
+
+# Cache directories
+.cache/
+cache/
+
+# Configuration files (user-specific)
+config.conf
+*.conf.local
+
+# Build artifacts
+build/
+dist/
+*.deb
+*.rpm
+*.tar.gz
+*.zip
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Test outputs
+test_output/
+coverage/
+.coverage
+*.coverage
+
+# User-specific capture directories (if symlinked)
+captures/
+gifs/
+screenshots/
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Dependencies (if using package managers)
+node_modules/
+vendor/
+
+# Local development
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Documentation build
+docs/_build/
+site/
+
+# Release artifacts
+releases/
+*.AppImage
+*.flatpak
+*.snap
+
+# Profiling data
+*.prof
+profile.out
+
+# Binary files
+*.o
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Archive files
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Compiled Python files (if Python components are added)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Rust artifacts (if Rust components are added)
+target/
+Cargo.lock
+
+# Go artifacts (if Go components are added)
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+vendor/
+
+# Local test files
+test_*.gif
+test_*.png
+test_*.mp4
+sample_*
+
+# User configuration backups
+hyprland.conf.bak
+sway.conf.bak
+
+# Package manager files
+*.deb
+*.rpm
+PKGBUILD
+*.pkg.tar.xz
+
+# Flatpak/Snap build files
+*.flatpak-builder/
+snap/.snapcraft/
+parts/
+stage/
+prime/
+
+# Development tools
+.shellcheckrc
+.editorconfig.local
+
+# Performance profiling
+perf.data*
+callgrind.out.*
+
+# Memory debugging
+valgrind-*.log
+*.memcheck
+
+# Security scan results
+*.sarif
+security-report.*
+
+# Benchmark results
+benchmark_*.txt
+performance_*.log
+
+# Custom user scripts
+user_*.sh
+custom_*.sh
+local_*.sh
