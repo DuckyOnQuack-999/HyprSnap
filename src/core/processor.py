@@ -161,9 +161,19 @@ class ContentProcessor:
             # Detect encoding
             if CHARDET_AVAILABLE:
                 result = chardet.detect(raw_content)
-                encoding = result['encoding'] or 'utf-8'
+                encoding = result['encoding']
+                if not encoding:
+                    encoding = 'utf-8'
+                    logging.warning(
+                        "Encoding detection failed for '%s'. Falling back to 'utf-8'. This may cause decoding issues for non-UTF-8 files.",
+                        input_path
+                    )
             else:
                 encoding = 'utf-8'
+                logging.warning(
+                    "chardet not available. Falling back to 'utf-8' for '%s'. This may cause decoding issues for non-UTF-8 files.",
+                    input_path
+                )
             
             # Decode content
             try:
