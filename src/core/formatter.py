@@ -5,14 +5,7 @@ logger = logging.getLogger(__name__)
 
 import os
 import json
-import yaml
-import markdown
-try:
-    import pdfkit
-    PDFKIT_AVAILABLE = True
-except ImportError:
-    PDFKIT_AVAILABLE = False
-    logger.warning("pdfkit not available. PDF output will be disabled.")
+import logging
 from pathlib import Path
 from typing import Dict, List, Union, Optional, Any
 from dataclasses import dataclass
@@ -20,6 +13,27 @@ import hashlib
 import difflib
 import re
 from datetime import datetime
+
+# Optional imports with fallbacks
+try:
+    import yaml
+    YAML_AVAILABLE = True
+except ImportError:
+    YAML_AVAILABLE = False
+    yaml = None
+
+try:
+    import markdown
+    MARKDOWN_AVAILABLE = True
+except ImportError:
+    MARKDOWN_AVAILABLE = False
+    markdown = None
+
+try:
+    import pdfkit
+    PDFKIT_AVAILABLE = True
+except ImportError:
+    PDFKIT_AVAILABLE = False
 
 # Configure logging
 logging.basicConfig(
@@ -312,7 +326,11 @@ class OutputFormatter:
         """Format output as HTML."""
         # Convert markdown to HTML
         markdown_content = self._format_markdown(content, metadata, analysis)
-        html_content = markdown.markdown(markdown_content)
+        if MARKDOWN_AVAILABLE:
+            html_content = markdown.markdown(markdown_content)
+        else:
+            # Simple fallback HTML conversion
+            html_content = markdown_content.replace('\n', '<br>\n')
         
         # Add HTML template
         template = f"""<!DOCTYPE html>

@@ -3,14 +3,22 @@
 # Error handling module for HyprSnap
 # Provides enhanced error management and logging capabilities
 
+# Prevent multiple sourcing
+if [[ -n "${HYPRSNAP_ERROR_LOADED:-}" ]]; then
+    return 0
+fi
+export HYPRSNAP_ERROR_LOADED=1
+
 # Error severity levels
-declare -rA ERROR_LEVELS=(
-    [DEBUG]=0
-    [INFO]=1
-    [WARNING]=2
-    [ERROR]=3
-    [CRITICAL]=4
-)
+if [[ -z "${ERROR_LEVELS:-}" ]]; then
+    declare -A ERROR_LEVELS=(
+        [DEBUG]=0
+        [INFO]=1
+        [WARNING]=2
+        [ERROR]=3
+        [CRITICAL]=4
+    )
+fi
 
 # Current log level (default to INFO)
 LOG_LEVEL=${LOG_LEVEL:-"INFO"}
