@@ -3,12 +3,6 @@
 # Configuration module for HyprSnap
 # Provides enhanced configuration management and validation
 
-# Prevent multiple sourcing
-if [[ -n "${HYPRSNAP_CONFIG_LOADED:-}" ]]; then
-    return 0
-fi
-export HYPRSNAP_CONFIG_LOADED=1
-
 # Source error handling
 source "$(dirname "${BASH_SOURCE[0]}")/error.sh"
 
@@ -51,14 +45,14 @@ check_dependencies() {
     fi
     
     # Optional optimization tools
-    if [[ "${OPTIMIZE_BY_DEFAULT:-false}" == "true" ]]; then
+    if [[ $OPTIMIZE_BY_DEFAULT == "true" ]]; then
         command -v optipng >/dev/null || missing_deps+=("optipng (optional)")
         command -v jpegoptim >/dev/null || missing_deps+=("jpegoptim (optional)")
         command -v cwebp >/dev/null || missing_deps+=("libwebp/cwebp (optional)")
     fi
     
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
-        log_message "WARNING" "Missing dependencies: ${missing_deps[*]}"
+        handle_error 1 "Missing dependencies: ${missing_deps[*]}" "WARNING"
         log_message "INFO" "Install missing dependencies:"
         log_message "INFO" "Arch: sudo pacman -S grim slurp wf-recorder ffmpeg imagemagick yq optipng jpegoptim libwebp"
         log_message "INFO" "Ubuntu: sudo apt install grim slurp wf-recorder ffmpeg imagemagick-6.q16 yq optipng jpegoptim webp"
@@ -79,8 +73,8 @@ validate_config() {
     
     # Check yq availability
     if ! command -v yq >/dev/null; then
-        log_message "WARNING" "yq command not found. Using fallback configuration."
-        return 0  # Don't fail, just use defaults
+        handle_error 1 "yq command not found. Please install yq to parse YAML config files" "ERROR"
+        return 1
     fi
     
     # Validate FPS (with fallbacks)
@@ -133,38 +127,32 @@ load_config() {
     # Check dependencies after loading config
     check_dependencies
     
-    # Load configuration values with fallbacks
-    if command -v yq >/dev/null; then
-        # Use yq if available
-        DEFAULT_FPS=$(yq e '.default_fps // 15' "$CONFIG_FILE")
-        DEFAULT_QUALITY=$(yq e '.default_quality // 80' "$CONFIG_FILE")
-        SAVE_DIR=$(yq e '.save_directory // "~/Pictures/HyprSnap"' "$CONFIG_FILE")
-        GIF_DIR=$(yq e '.gif_directory // "~/Pictures/HyprSnap/GIFs"' "$CONFIG_FILE")
-        VIDEO_DIR=$(yq e '.video_directory // "~/Pictures/HyprSnap/Videos"' "$CONFIG_FILE")
-        DEBUG_ENABLED=$(yq e '.debug_enabled // .debug.enabled // false' "$CONFIG_FILE")
-        NOTIFICATIONS_ENABLED=$(yq e '.notifications_enabled // .notifications.enabled // true' "$CONFIG_FILE")
-        FFMPEG_CODEC=$(yq e '.ffmpeg_codec // .ffmpeg.codec // "libx264"' "$CONFIG_FILE")
-        SCREENSHOT_FORMAT=$(yq e '.screenshot_format // .screenshot.format // "png"' "$CONFIG_FILE")
-        MAX_THREADS=$(yq e '.max_threads // .performance.max_threads // 4' "$CONFIG_FILE")
-        TEMP_DIR=$(yq e '.temp_directory // .performance.temp_directory // "/tmp/hyprsnap"' "$CONFIG_FILE")
-        CLEANUP_OLDER_THAN=$(yq e '.cleanup_older_than // .performance.cleanup_older_than // 24' "$CONFIG_FILE")
-        OPTIMIZE_BY_DEFAULT=$(yq e '.optimize_by_default // false' "$CONFIG_FILE")
-    else
-        # Use default values when yq is not available
-        DEFAULT_FPS=15
-        DEFAULT_QUALITY=80
-        SAVE_DIR="$HOME/Pictures/HyprSnap"
-        GIF_DIR="$HOME/Pictures/HyprSnap/GIFs"
-        VIDEO_DIR="$HOME/Pictures/HyprSnap/Videos"
-        DEBUG_ENABLED=false
-        NOTIFICATIONS_ENABLED=true
-        FFMPEG_CODEC="libx264"
-        SCREENSHOT_FORMAT="png"
-        MAX_THREADS=4
-        TEMP_DIR="/tmp/hyprsnap"
-        CLEANUP_OLDER_THAN=24
-        OPTIMIZE_BY_DEFAULT=false
-    fi
+    # Load configuration values with fallbacks to support both flat and nested structures
+    DEFAULT_FPS=$(yq e '.default_fps // 15' "$CONFIG_FILE")
+    DEFAULT_QUALITY=$(yq e '.default_quality // 80' "$CONFIG_FILE")
+    SAVE_DIR=$(yq e '.save_directory // "~/Pictures/HyprSnap"' "$CONFIG_FILE")
+    GIF_DIR=$(yq e '.gif_directory // "~/Pictures/HyprSnap/GIFs"' "$CONFIG_FILE")
+    VIDEO_DIR=$(yq e '.video_directory // "~/Pictures/HyprSnap/Videos"' "$CONFIG_FILE")
+    
+    # Debug settings - support both flat and nested structures
+    DEBUG_ENABLED=$(yq e '.debug_enabled // .debug.enabled // false' "$CONFIG_FILE")
+    
+    # Notification settings
+    NOTIFICATIONS_ENABLED=$(yq e '.notifications_enabled // .notifications.enabled // true' "$CONFIG_FILE")
+    
+    # FFmpeg settings
+    FFMPEG_CODEC=$(yq e '.ffmpeg_codec // .ffmpeg.codec // "libx264"' "$CONFIG_FILE")
+    
+    # Screenshot format - support both locations
+    SCREENSHOT_FORMAT=$(yq e '.screenshot_format // .screenshot.format // "png"' "$CONFIG_FILE")
+    
+    # Performance settings
+    MAX_THREADS=$(yq e '.max_threads // .performance.max_threads // 4' "$CONFIG_FILE")
+    TEMP_DIR=$(yq e '.temp_directory // .performance.temp_directory // "/tmp/hyprsnap"' "$CONFIG_FILE")
+    CLEANUP_OLDER_THAN=$(yq e '.cleanup_older_than // .performance.cleanup_older_than // 24' "$CONFIG_FILE")
+    
+    # Optimization setting
+    OPTIMIZE_BY_DEFAULT=$(yq e '.optimize_by_default // false' "$CONFIG_FILE")
     
     # Export variables
     export DEFAULT_FPS DEFAULT_QUALITY SAVE_DIR GIF_DIR VIDEO_DIR DEBUG_ENABLED

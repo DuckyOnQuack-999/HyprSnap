@@ -2,6 +2,9 @@
 
 import os
 import json
+import yaml
+import chardet
+import magic
 import logging
 import hashlib
 import difflib
@@ -15,28 +18,6 @@ import tokenize
 import io
 import traceback
 from datetime import datetime
-
-# Optional imports with fallbacks
-try:
-    import yaml
-    YAML_AVAILABLE = True
-except ImportError:
-    YAML_AVAILABLE = False
-    yaml = None
-
-try:
-    import chardet
-    CHARDET_AVAILABLE = True
-except ImportError:
-    CHARDET_AVAILABLE = False
-    chardet = None
-
-try:
-    import magic
-    MAGIC_AVAILABLE = True
-except ImportError:
-    MAGIC_AVAILABLE = False
-    magic = None
 
 # Configure logging
 logging.basicConfig(
@@ -159,28 +140,11 @@ class ContentProcessor:
                 raw_content = f.read()
             
             # Detect encoding
-            if CHARDET_AVAILABLE:
-                result = chardet.detect(raw_content)
-                encoding = result['encoding']
-                if not encoding:
-                    encoding = 'utf-8'
-                    logging.warning(
-                        "Encoding detection failed for '%s'. Falling back to 'utf-8'. This may cause decoding issues for non-UTF-8 files.",
-                        input_path
-                    )
-            else:
-                encoding = 'utf-8'
-                logging.warning(
-                    "chardet not available. Falling back to 'utf-8' for '%s'. This may cause decoding issues for non-UTF-8 files.",
-                    input_path
-                )
+            result = chardet.detect(raw_content)
+            encoding = result['encoding']
             
             # Decode content
-            try:
-                content = raw_content.decode(encoding)
-            except UnicodeDecodeError:
-                # Fallback to utf-8 with error handling
-                content = raw_content.decode('utf-8', errors='replace')
+            content = raw_content.decode(encoding)
             
             # Cache content
             self.content_cache[input_path] = content
@@ -199,23 +163,8 @@ class ContentProcessor:
             stats = path.stat()
             
             # Detect file type
-            if MAGIC_AVAILABLE:
-                mime = magic.Magic(mime=True)
-                file_type = mime.from_file(input_path)
-            else:
-                # Fallback to extension-based detection
-                ext = path.suffix.lower()
-                mime_map = {
-                    '.py': 'text/x-python',
-                    '.js': 'text/javascript',
-                    '.md': 'text/markdown',
-                    '.json': 'application/json',
-                    '.yaml': 'text/yaml',
-                    '.yml': 'text/yaml',
-                    '.txt': 'text/plain',
-                    '.sh': 'text/x-shellscript'
-                }
-                file_type = mime_map.get(ext, 'text/plain')
+            mime = magic.Magic(mime=True)
+            file_type = mime.from_file(input_path)
             
             # Detect language
             language = self._detect_language(content, input_path)
@@ -643,18 +592,15 @@ class ContentProcessor:
             
             # Extract YAML structure
             elif self._detect_language(content) in ['yaml', 'yml']:
-                if YAML_AVAILABLE:
-                    try:
-                        data = yaml.safe_load(content)
-                        structure['metadata'] = {
-                            'type': type(data).__name__,
-                            'keys': list(data.keys()) if isinstance(data, dict) else None,
-                            'length': len(data) if isinstance(data, (list, dict)) else None
-                        }
-                    except yaml.YAMLError as e:
-                        logger.error(f"Error parsing YAML structure: {e}")
-                else:
-                    logger.warning("YAML parsing not available - install PyYAML for full support")
+                try:
+                    data = yaml.safe_load(content)
+                    structure['metadata'] = {
+                        'type': type(data).__name__,
+                        'keys': list(data.keys()) if isinstance(data, dict) else None,
+                        'length': len(data) if isinstance(data, (list, dict)) else None
+                    }
+                except yaml.YAMLError as e:
+                    logger.error(f"Error parsing YAML structure: {e}")
             
             return structure
             
