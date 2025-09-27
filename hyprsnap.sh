@@ -24,7 +24,7 @@
 set -euo pipefail
 
 # Script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
 # Source modules
 source "$SCRIPT_DIR/utils/error.sh"
@@ -47,6 +47,7 @@ Commands:
   record           Record screen
   edit             Edit image/recording
   batch            Batch process files
+  web              Start web interface
   init             Initialize configuration
   cleanup          Clean up temporary files
 
@@ -76,6 +77,7 @@ Examples:
   hyprsnap record --format mp4 --fps 30 --quality 23 --hw --audio --duration 10 --output recording.mp4
   hyprsnap edit -i image.png -f blur
   hyprsnap batch -i input/ -o output/ --format webp --quality 80
+  hyprsnap web --host 0.0.0.0 --port 5000
 EOF
 }
 
@@ -262,6 +264,51 @@ parse_edit_opts() {
     apply_filter "$image" "$filter" "$params"
 }
 
+# Parse web-specific options
+parse_web_opts() {
+    local host="127.0.0.1"
+    local port="5000"
+    local debug="false"
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --host)
+                host="$2"
+                shift 2
+                ;;
+            --port)
+                port="$2"
+                shift 2
+                ;;
+            --debug)
+                debug="true"
+                shift
+                ;;
+            -h|--help)
+                echo "Web Interface Options:"
+                echo "  --host HOST     Host to bind to (default: 127.0.0.1)"
+                echo "  --port PORT     Port to bind to (default: 5000)"
+                echo "  --debug         Enable debug mode"
+                exit 0
+                ;;
+            *)
+                echo "Unknown web option: $1" >&2
+                echo "Use --help for web interface options"
+                exit 1
+                ;;
+        esac
+    done
+    
+    # Start web interface
+    if [[ -f "$SCRIPT_DIR/web/start.sh" ]]; then
+        cd "$SCRIPT_DIR/web"
+        python3 app.py --host "$host" --port "$port" --debug="$debug"
+    else
+        echo "Error: Web interface not found at $SCRIPT_DIR/web/" >&2
+        exit 1
+    fi
+}
+
 # Parse command line arguments
 parse_args() {
     local command=""
@@ -281,7 +328,7 @@ parse_args() {
                 DEBUG=1
                 shift
                 ;;
-            shot|record|edit|batch|init|cleanup)
+            shot|record|edit|batch|web|init|cleanup)
                 command="$1"
                 shift
                 break  # Stop processing global options when we hit a command
@@ -307,6 +354,9 @@ parse_args() {
             ;;
         batch)
             parse_batch_opts "$@"
+            ;;
+        web)
+            parse_web_opts "$@"
             ;;
         init)
             init_config
