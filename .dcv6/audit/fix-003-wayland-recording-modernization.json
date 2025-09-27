@@ -1,0 +1,35 @@
+{
+  "changeset_id": "fix-003-wayland-recording-modernization",
+  "timestamp": "2025-01-10T21:00:00Z", 
+  "confidence": 0.85,
+  "category": "shell_modernization",
+  "description": "Modernize Wayland recording pipeline with wf-recorder-centric approach and smart fallbacks",
+  "files_modified": [
+    {
+      "path": "core/recording.sh",
+      "lines_changed": [57, 134],
+      "change_type": "major_refactor",
+      "reason": "Replaced ffmpeg x11grab hardcoded approach with Wayland-first wf-recorder implementation, supporting cross-compositor geometry detection and hardware-accelerated encoding."
+    }
+  ],
+  "issues_addressed": [
+    "Hardcoded ffmpeg x11grab conflicts with Wayland-first design",
+    "Swaymsg-only geometry detection excludes Hyprland and other compositors", 
+    "Missing GPU-aware encoding support (VAAPI/NVENC)",
+    "No session type detection for Wayland vs X11 environments",
+    "Lack of modern wf-recorder integration for native Wayland capture"
+  ],
+  "improvements": [
+    "Implemented Wayland-first recording using wf-recorder as primary capture method",
+    "Added cross-compositor support: Hyprland (hyprctl), Sway (swaymsg), generic slurp fallback",
+    "Integrated hardware acceleration with intelligent fallback: VAAPI → NVENC → software",
+    "Added session type detection using XDG_SESSION_TYPE with wayland default",
+    "Maintained X11 compatibility with original ffmpeg x11grab approach",
+    "Enhanced MP4 encoding with better quality settings (CRF 23, medium preset)",
+    "Improved audio handling for Wayland captures using wf-recorder --audio",
+    "Added proper temporary file handling for two-stage Wayland recording process"
+  ],
+  "risk_assessment": "medium", 
+  "testing_required": true,
+  "rollback_notes": "Can revert to original ffmpeg x11grab approach by restoring previous geometry detection and ffmpeg command construction"
+}

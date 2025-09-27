@@ -1,0 +1,98 @@
+{
+  "audit_entry": {
+    "id": "fix-004-cli-ux-normalization",
+    "timestamp": "2025-01-10T10:45:00Z",
+    "type": "high_confidence_fix",
+    "confidence_score": 0.92,
+    "category": "cli_ux_improvement",
+    "title": "Normalize CLI UX with subcommand-specific option parsing",
+    "description": "Resolved global flag collision (-f overloaded for format) by implementing dedicated parsers for each subcommand with clear, specific options.",
+    
+    "issues_addressed": [
+      {
+        "issue": "Global flag collision (-f for both screenshot format and recording format)",
+        "severity": "medium",
+        "impact": "User confusion and potential incorrect command execution"
+      },
+      {
+        "issue": "Mixed output path defaults (image vs video directories)",
+        "severity": "low", 
+        "impact": "Files saved to unexpected locations"
+      },
+      {
+        "issue": "Inconsistent option parsing across subcommands",
+        "severity": "medium",
+        "impact": "Poor user experience and maintenance complexity"
+      }
+    ],
+
+    "changes_made": [
+      {
+        "file": "hyprsnap.sh",
+        "type": "major_refactor",
+        "changes": [
+          "Replaced global option parsing with subcommand-specific parsers",
+          "Added parse_shot_opts() for screenshot-specific options (--format, --quality, -o/--output)",
+          "Added parse_record_opts() for recording-specific options (--format, --fps, --quality, --duration, --audio, --hw, -o/--output)",
+          "Added parse_batch_opts() and parse_edit_opts() for consistency",
+          "Improved help text with subcommand-specific option documentation",
+          "Added proper error handling and validation for each subcommand"
+        ]
+      },
+      {
+        "file": "utils/config.sh",
+        "type": "config_enhancement",
+        "changes": [
+          "Added video_directory configuration separate from gif_directory",
+          "Updated configuration loading to include VIDEO_DIR variable",
+          "Separated video and GIF output directories for better organization"
+        ]
+      }
+    ],
+
+    "improvements": [
+      "Eliminated flag collision between screenshot and recording formats",
+      "Clear separation of concerns with subcommand-specific options",
+      "Improved user experience with specific, contextual help",
+      "Better output file organization with dedicated video/gif directories",
+      "Enhanced error messages for invalid options per subcommand",
+      "Consistent option naming across all subcommands"
+    ],
+
+    "testing_notes": [
+      "Verify 'hyprsnap shot --format png area' works correctly",
+      "Verify 'hyprsnap record --format mp4 --fps 30' works correctly", 
+      "Test help output shows subcommand-specific options",
+      "Test error handling for invalid options per subcommand",
+      "Verify output paths use correct directories (screenshots vs videos vs gifs)"
+    ],
+
+    "backward_compatibility": {
+      "breaking_changes": [
+        "Global -f flag no longer exists - users must specify --format per subcommand",
+        "Some legacy option combinations may no longer work"
+      ],
+      "migration_path": "Users need to update scripts to use subcommand-specific --format flags"
+    },
+
+    "risk_assessment": {
+      "risk_level": "medium", 
+      "concerns": [
+        "Breaking change for existing users/scripts using global -f flag",
+        "New directory structure may confuse existing workflows"
+      ],
+      "mitigations": [
+        "Clear documentation of new CLI usage",
+        "Informative error messages guide users to correct syntax"
+      ]
+    },
+
+    "metadata": {
+      "files_modified": 2,
+      "lines_changed": 180,
+      "functions_added": 4,
+      "dependencies": ["yq for config loading"],
+      "estimated_impact": "High - significantly improves CLI usability"
+    }
+  }
+}

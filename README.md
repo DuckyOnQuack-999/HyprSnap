@@ -84,16 +84,16 @@ Perfect for developers, content creators, and anyone who needs professional-qual
 
 #### Tested Environments
 - **Distributions**
-- Arch Linux / Manjaro (Primary)
-- Ubuntu 22.04+
-- Fedora 38+
-- openSUSE Tumbleweed
+  - Arch Linux / Manjaro (Primary)
+  - Ubuntu 22.04+
+  - Fedora 38+
+  - openSUSE Tumbleweed
 
 - **Compositors**
-- Hyprland (Recommended)
-- Sway
-- GNOME Wayland
-- KDE Plasma Wayland
+  - Hyprland (Recommended)
+  - Sway
+  - GNOME Wayland
+  - KDE Plasma Wayland
 
 > Note: X11 support is limited and not recommended
 

@@ -1,316 +1,390 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# HyprSnap - Lightning-fast screen capture suite for modern Linux
-# Created by DuckyOnQuack-999
-# Version: 1.0.0
+#===================================================================================
+# HyprSnap - Modern Linux Screen Capture Suite
+#===================================================================================
+#
+# A lightning-fast screen capture tool for modern Linux desktops
+# Version: 2.0.0
+#
+# Author: DuckyOnQuack-999 (https://github.com/DuckyOnQuack-999)
 # License: MIT
+# Repository: https://github.com/DuckyOnQuack-999/HyprSnap
+#
+# Features:
+# - Screenshot capture (full, area, window)
+# - Screen recording (GIF, MP4, WebM)
+# - Image editing and optimization
+# - Batch processing
+# - Hardware acceleration
+# - Wayland compositor support
+# - Modern notification system
+#===================================================================================
 
 set -euo pipefail
 
-# Configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_DIR="$HOME/.config/hyprsnap"
-CAPTURE_DIR="$HOME/Pictures/HyprSnap"
-GIF_DIR="$CAPTURE_DIR/Gifs"
-SCREENSHOT_DIR="$CAPTURE_DIR/Screenshots"
-LOG_FILE="$CONFIG_DIR/hyprsnap.log"
+# Script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
-# Default settings
-DEFAULT_QUALITY=90
-DEFAULT_FPS=15
-DEFAULT_OPTIMIZE=false
-DEBUG_MODE=false
+# Source modules
+source "$SCRIPT_DIR/utils/error.sh"
+source "$SCRIPT_DIR/utils/config.sh"
+source "$SCRIPT_DIR/core/screenshot.sh"
+source "$SCRIPT_DIR/core/recording.sh"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+# Version
+VERSION="2.0.0"
 
-# Logging function
-log() {
-    local level="$1"
-    shift
-    local message="$*"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    
-    if [[ "$DEBUG_MODE" == true ]] || [[ "$level" != "DEBUG" ]]; then
-        echo -e "${timestamp} [$level] $message" | tee -a "$LOG_FILE"
-    else
-        echo "${timestamp} [$level] $message" >> "$LOG_FILE"
-    fi
+# Help message
+show_help() {
+    cat <<EOF
+HyprSnap v$VERSION - Modern Linux Screen Capture Suite
+
+Usage: hyprsnap [command] [options]
+
+Commands:
+  shot              Take a screenshot
+  record           Record screen
+  edit             Edit image/recording
+  batch            Batch process files
+  web              Start web interface
+  init             Initialize configuration
+  cleanup          Clean up temporary files
+
+Global Options:
+  -h, --help       Show this help message
+  -v, --version    Show version information
+  -d, --debug      Enable debug mode
+
+Screenshot Options (hyprsnap shot):
+  --format FORMAT  Set format: png|jpg|webp (default: png)
+  --quality N      Set quality 1-100 (default: 90)
+  -o, --output     Set output file
+  [full|area|window]  Screenshot type (default: full)
+
+Recording Options (hyprsnap record):
+  --format FORMAT  Set format: gif|mp4|webm (default: gif)
+  --fps N          Set frame rate (default: 30)
+  --quality N      Set quality 1-51 for video (default: 23)
+  --duration N     Set duration in seconds (default: infinite)
+  --audio          Enable audio recording
+  --hw             Enable hardware acceleration
+  -o, --output     Set output file
+  [full|area|window]  Recording type (default: full)
+
+Examples:
+  hyprsnap shot --format png --quality 90 --output screenshot.png area
+  hyprsnap record --format mp4 --fps 30 --quality 23 --hw --audio --duration 10 --output recording.mp4
+  hyprsnap edit -i image.png -f blur
+  hyprsnap batch -i input/ -o output/ --format webp --quality 80
+  hyprsnap web --host 0.0.0.0 --port 5000
+EOF
 }
 
-# Error handling
-error_exit() {
-    log "ERROR" "$1"
-    dunstify -u critical -t 5000 "HyprSnap Error" "$1"
-    exit 1
-}
-
-# Success notification
-success_notify() {
-    log "INFO" "$1"
-    dunstify -u normal -t 3000 "HyprSnap" "$1"
-}
-
-# Check dependencies
-check_dependencies() {
-    local missing_deps=()
-    local deps=("wf-recorder" "ffmpeg" "slurp" "dunstify")
+# Parse screenshot-specific options
+parse_shot_opts() {
+    local shot_format="${SCREENSHOT_FORMAT:-png}"
+    local shot_quality="${DEFAULT_QUALITY:-90}"
+    local output=""
+    local shot_type="FULL"
     
-    # Check for clipboard tools
-    if ! command -v wl-copy >/dev/null 2>&1 && ! command -v xclip >/dev/null 2>&1; then
-        missing_deps+=("wl-copy or xclip")
-    fi
-    
-    for dep in "${deps[@]}"; do
-        if ! command -v "$dep" >/dev/null 2>&1; then
-            missing_deps+=("$dep")
-        fi
-    done
-    
-    if [[ ${#missing_deps[@]} -gt 0 ]]; then
-        error_exit "Missing dependencies: ${missing_deps[*]}. Please install them first."
-    fi
-    
-    log "DEBUG" "All dependencies satisfied"
-}
-
-# Setup directories
-setup_directories() {
-    mkdir -p "$CONFIG_DIR" "$GIF_DIR" "$SCREENSHOT_DIR"
-    touch "$LOG_FILE"
-    log "DEBUG" "Directories created: $CONFIG_DIR, $GIF_DIR, $SCREENSHOT_DIR"
-}
-
-# Get system info
-get_system_info() {
-    echo "=== HyprSnap System Information ==="
-    echo "Version: 1.0.0"
-    echo "OS: $(uname -a)"
-    echo "Wayland Compositor: ${XDG_CURRENT_DESKTOP:-Unknown}"
-    echo "Session Type: ${XDG_SESSION_TYPE:-Unknown}"
-    echo ""
-    echo "Dependencies:"
-    for cmd in wf-recorder ffmpeg slurp dunstify wl-copy xclip; do
-        if command -v "$cmd" >/dev/null 2>&1; then
-            echo "  ✓ $cmd: $(command -v "$cmd")"
-        else
-            echo "  ✗ $cmd: Not found"
-        fi
-    done
-    echo ""
-    echo "Directories:"
-    echo "  Config: $CONFIG_DIR"
-    echo "  Captures: $CAPTURE_DIR"
-    echo "  Logs: $LOG_FILE"
-}
-
-# Record GIF
-record_gif() {
-    local quality="$DEFAULT_QUALITY"
-    local fps="$DEFAULT_FPS"
-    local optimize="$DEFAULT_OPTIMIZE"
-    local output_file=""
-    
-    # Parse arguments
     while [[ $# -gt 0 ]]; do
         case $1 in
-            -q|--quality)
-                quality="$2"
+            --format)
+                shot_format="$2"
                 shift 2
                 ;;
-            -f|--fps)
-                fps="$2"
+            --quality)
+                shot_quality="$2"
                 shift 2
                 ;;
-            -o|--optimize)
-                optimize=true
-                shift
+            -o|--output)
+                output="$2"
+                shift 2
                 ;;
-            -d|--debug)
-                DEBUG_MODE=true
+            full|area|window)
+                shot_type="${1^^}"
                 shift
                 ;;
             *)
-                shift
+                echo "Unknown shot option: $1" >&2
+                show_help
+                exit 1
                 ;;
         esac
     done
     
-    # Validate quality
-    if [[ ! "$quality" =~ ^[0-9]+$ ]] || [[ "$quality" -lt 1 ]] || [[ "$quality" -gt 100 ]]; then
-        error_exit "Quality must be between 1 and 100"
+    # Set default output path if not specified
+    if [[ -z "$output" ]]; then
+        output="$SAVE_DIR/screenshot.$shot_format"
     fi
     
-    # Validate FPS
-    if [[ ! "$fps" =~ ^[0-9]+$ ]] || [[ "$fps" -lt 1 ]] || [[ "$fps" -gt 60 ]]; then
-        error_exit "FPS must be between 1 and 60"
-    fi
-    
-    log "INFO" "Starting GIF recording with quality=$quality, fps=$fps, optimize=$optimize"
-    
-    # Get area selection
-    local geometry
-    geometry=$(slurp 2>/dev/null) || error_exit "Area selection cancelled or failed"
-    
-    log "DEBUG" "Selected area: $geometry"
-    
-    # Generate output filename
-    local timestamp=$(date '+%Y%m%d_%H%M%S')
-    output_file="$GIF_DIR/hyprsnap_${timestamp}.gif"
-    local temp_video="/tmp/hyprsnap_${timestamp}.mp4"
-    
-    # Start recording notification
-    dunstify -u normal -t 2000 "HyprSnap" "Recording started! Press Super+Ctrl+C to stop"
-    
-    # Record video
-    log "DEBUG" "Recording to temporary file: $temp_video"
-    wf-recorder -g "$geometry" -f "$temp_video" -r "$fps" &
-    local recorder_pid=$!
-    
-    # Wait for user to stop recording (you'll need to implement signal handling)
-    # For now, we'll use a simple approach
-    echo "Recording... Press Ctrl+C to stop"
-    wait $recorder_pid || true
-    
-    # Check if recording was successful
-    if [[ ! -f "$temp_video" ]]; then
-        error_exit "Recording failed - no output file created"
-    fi
-    
-    log "INFO" "Recording completed, converting to GIF..."
-    dunstify -u normal -t 2000 "HyprSnap" "Processing GIF..."
-    
-    # Convert to GIF with quality settings
-    local palette="/tmp/hyprsnap_palette_${timestamp}.png"
-    
-    # Generate palette
-    if ! ffmpeg -i "$temp_video" -vf "fps=$fps,scale=-1:-1:flags=lanczos,palettegen=max_colors=256" -y "$palette" >/dev/null 2>&1; then
-        rm -f "$temp_video"
-        error_exit "Failed to generate color palette"
-    fi
-    
-    # Create GIF
-    local filter_complex="fps=$fps,scale=-1:-1:flags=lanczos[x];[x][1:v]paletteuse"
-    if [[ "$optimize" == true ]]; then
-        filter_complex="${filter_complex}=dither=bayer:bayer_scale=5:diff_mode=rectangle"
-    fi
-    
-    if ! ffmpeg -i "$temp_video" -i "$palette" -filter_complex "$filter_complex" -y "$output_file" >/dev/null 2>&1; then
-        rm -f "$temp_video" "$palette"
-        error_exit "Failed to create GIF"
-    fi
-    
-    # Cleanup
-    rm -f "$temp_video" "$palette"
-    
-    # Get file size
-    local file_size=$(du -h "$output_file" | cut -f1)
-    
-    log "INFO" "GIF created successfully: $output_file ($file_size)"
-    success_notify "GIF saved: $(basename "$output_file") ($file_size)"
-    
-    # Copy to clipboard if available
-    if command -v wl-copy >/dev/null 2>&1; then
-        wl-copy < "$output_file" && log "DEBUG" "GIF copied to clipboard"
-    elif command -v xclip >/dev/null 2>&1; then
-        xclip -selection clipboard -t image/gif < "$output_file" && log "DEBUG" "GIF copied to clipboard"
-    fi
-    
-    echo "GIF saved to: $output_file"
+    take_screenshot "$shot_type" "$output" "$shot_format" "$shot_quality"
 }
 
-# Take screenshot (placeholder for future implementation)
-take_screenshot() {
-    echo "Screenshot functionality coming soon!"
-    log "INFO" "Screenshot feature requested (not yet implemented)"
-}
-
-# Show help
-show_help() {
-    cat << EOF
-HyprSnap - Lightning-fast screen capture suite for modern Linux
-Version: 1.0.0
-
-USAGE:
-    ./hyprsnap.sh <command> [options]
-
-COMMANDS:
-    record              Record a GIF (default)
-    shot               Take a screenshot (coming soon)
-    area               Screenshot selected area (coming soon)  
-    window             Screenshot active window (coming soon)
-    --system-info      Display system information
-    --check            Check dependencies
-    -h, --help         Show this help
-
-GIF RECORDING OPTIONS:
-    -q, --quality <1-100>    Set GIF quality (default: $DEFAULT_QUALITY)
-    -f, --fps <number>       Set frame rate (default: $DEFAULT_FPS)
-    -o, --optimize           Enable optimization for smaller files
-    -d, --debug              Enable debug output
-
-EXAMPLES:
-    ./hyprsnap.sh record                    # Basic GIF recording
-    ./hyprsnap.sh record -q 95 -f 30        # High quality, 30fps
-    ./hyprsnap.sh record -q 75 -o           # Optimized for sharing
-    ./hyprsnap.sh --system-info             # Show system info
-
-OUTPUT LOCATIONS:
-    GIFs: $GIF_DIR
-    Screenshots: $SCREENSHOT_DIR
-    Logs: $LOG_FILE
-
-For more information, visit: https://github.com/DuckyOnQuack-999/HyprSnap
-EOF
-}
-
-# Main function
-main() {
-    # Setup
-    setup_directories
+# Parse recording-specific options
+parse_record_opts() {
+    local record_format="gif"
+    local record_fps="${DEFAULT_FPS:-30}"
+    local record_quality="${DEFAULT_QUALITY:-23}"
+    local duration="0"
+    local audio="false"
+    local hw_accel="false"
+    local output=""
+    local record_type="FULL"
     
-    # Handle no arguments
-    if [[ $# -eq 0 ]]; then
-        show_help
-        exit 0
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --format)
+                record_format="$2"
+                shift 2
+                ;;
+            --fps)
+                record_fps="$2"
+                shift 2
+                ;;
+            --quality)
+                record_quality="$2"
+                shift 2
+                ;;
+            --duration)
+                duration="$2"
+                shift 2
+                ;;
+            --audio)
+                audio="true"
+                shift
+                ;;
+            --hw)
+                hw_accel="true"
+                shift
+                ;;
+            -o|--output)
+                output="$2"
+                shift 2
+                ;;
+            full|area|window)
+                record_type="${1^^}"
+                shift
+                ;;
+            *)
+                echo "Unknown record option: $1" >&2
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+    
+    # Set default output path if not specified
+    if [[ -z "$output" ]]; then
+        if [[ "$record_format" == "gif" ]]; then
+            output="$GIF_DIR/recording.$record_format"
+        else
+            output="$VIDEO_DIR/recording.$record_format"
+        fi
     fi
     
-    # Parse command
-    case "$1" in
+    record_screen "$record_type" "$output" "$duration" "$record_format" "$record_fps" "$record_quality" "$audio" "$hw_accel"
+}
+
+# Parse batch-specific options
+parse_batch_opts() {
+    local input_dir=""
+    local output_dir=""
+    local batch_format="${SCREENSHOT_FORMAT:-png}"
+    local batch_quality="${DEFAULT_QUALITY:-80}"
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -i|--input)
+                input_dir="$2"
+                shift 2
+                ;;
+            -o|--output)
+                output_dir="$2"
+                shift 2
+                ;;
+            --format)
+                batch_format="$2"
+                shift 2
+                ;;
+            --quality)
+                batch_quality="$2"
+                shift 2
+                ;;
+            *)
+                echo "Unknown batch option: $1" >&2
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+    
+    if [[ -z "$input_dir" || -z "$output_dir" ]]; then
+        echo "Error: Both input (-i) and output (-o) directories are required for batch processing" >&2
+        exit 1
+    fi
+    
+    batch_process "$input_dir" "$output_dir" "$batch_format" "$batch_quality"
+}
+
+# Parse edit-specific options
+parse_edit_opts() {
+    local image=""
+    local filter=""
+    local params=""
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -i|--input)
+                image="$2"
+                shift 2
+                ;;
+            -f|--filter)
+                filter="$2"
+                shift 2
+                ;;
+            -p|--params)
+                params="$2"
+                shift 2
+                ;;
+            *)
+                echo "Unknown edit option: $1" >&2
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+    
+    if [[ -z "$image" || -z "$filter" ]]; then
+        echo "Error: Both input image (-i) and filter (-f) are required for editing" >&2
+        exit 1
+    fi
+    
+    apply_filter "$image" "$filter" "$params"
+}
+
+# Parse web-specific options
+parse_web_opts() {
+    local host="127.0.0.1"
+    local port="5000"
+    local debug="false"
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --host)
+                host="$2"
+                shift 2
+                ;;
+            --port)
+                port="$2"
+                shift 2
+                ;;
+            --debug)
+                debug="true"
+                shift
+                ;;
+            -h|--help)
+                echo "Web Interface Options:"
+                echo "  --host HOST     Host to bind to (default: 127.0.0.1)"
+                echo "  --port PORT     Port to bind to (default: 5000)"
+                echo "  --debug         Enable debug mode"
+                exit 0
+                ;;
+            *)
+                echo "Unknown web option: $1" >&2
+                echo "Use --help for web interface options"
+                exit 1
+                ;;
+        esac
+    done
+    
+    # Start web interface
+    if [[ -f "$SCRIPT_DIR/web/start.sh" ]]; then
+        cd "$SCRIPT_DIR/web"
+        python3 app.py --host "$host" --port "$port" --debug="$debug"
+    else
+        echo "Error: Web interface not found at $SCRIPT_DIR/web/" >&2
+        exit 1
+    fi
+}
+
+# Parse command line arguments
+parse_args() {
+    local command=""
+    
+    # Parse global options first
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            -v|--version)
+                echo "HyprSnap v$VERSION"
+                exit 0
+                ;;
+            -d|--debug)
+                DEBUG=1
+                shift
+                ;;
+            shot|record|edit|batch|web|init|cleanup)
+                command="$1"
+                shift
+                break  # Stop processing global options when we hit a command
+                ;;
+            *)
+                echo "Unknown global option: $1" >&2
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+    
+    # Execute command with remaining arguments
+    case $command in
+        shot)
+            parse_shot_opts "$@"
+            ;;
         record)
-            check_dependencies
-            shift
-            record_gif "$@"
+            parse_record_opts "$@"
             ;;
-        shot|area|window)
-            take_screenshot
+        edit)
+            parse_edit_opts "$@"
             ;;
-        --system-info)
-            get_system_info
+        batch)
+            parse_batch_opts "$@"
             ;;
-        --check)
-            check_dependencies
-            echo "✓ All dependencies are satisfied"
+        web)
+            parse_web_opts "$@"
             ;;
-        -h|--help)
+        init)
+            init_config
+            ;;
+        cleanup)
+            cleanup
+            ;;
+        "")
+            echo "Error: No command specified" >&2
             show_help
+            exit 1
             ;;
         *)
-            echo "Unknown command: $1"
-            echo "Use --help for usage information"
+            echo "Error: Unknown command: $command" >&2
+            show_help
             exit 1
             ;;
     esac
 }
 
-# Signal handling for clean shutdown
-trap 'log "INFO" "HyprSnap interrupted by user"; exit 130' INT TERM
+# Main function
+main() {
+    # Initialize configuration
+    init_config
+    
+    # Parse command line arguments
+parse_args "$@"
+}
 
 # Run main function
 main "$@"

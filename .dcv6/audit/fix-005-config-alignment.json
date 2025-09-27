@@ -1,0 +1,110 @@
+{
+  "audit_entry": {
+    "id": "fix-005-config-alignment",
+    "timestamp": "2025-01-10T11:00:00Z",
+    "type": "high_confidence_fix",
+    "confidence_score": 0.89,
+    "category": "configuration_improvement",
+    "title": "Align configuration loading with nested structure and add dependency checks",
+    "description": "Updated config loading to support both flat and nested YAML structures with comprehensive fallbacks, and added runtime dependency validation.",
+    
+    "issues_addressed": [
+      {
+        "issue": "Config loading expects flat keys while repo uses nested structure",
+        "severity": "medium",
+        "impact": "Configuration not properly loaded from repository config.yaml"
+      },
+      {
+        "issue": "No fallback handling for missing or malformed config values",
+        "severity": "medium",
+        "impact": "Application failure when config is incomplete"
+      },
+      {
+        "issue": "No runtime dependency checking",
+        "severity": "high",
+        "impact": "Silent failures when required tools are missing"
+      },
+      {
+        "issue": "TEMP_DIR not loaded from config",
+        "severity": "low",
+        "impact": "Temporary directory not configurable"
+      }
+    ],
+
+    "changes_made": [
+      {
+        "file": "utils/config.sh",
+        "type": "major_enhancement",
+        "changes": [
+          "Added fallback support for both flat and nested config keys using yq",
+          "Updated all config loading with // fallback operators",
+          "Added comprehensive dependency checking function",
+          "Integrated TEMP_DIR loading with performance.temp_directory fallback",
+          "Enhanced validation to use same fallback pattern",
+          "Added distro-specific installation hints for missing dependencies"
+        ]
+      }
+    ],
+
+    "key_improvements": [
+      {
+        "feature": "Dual-structure support",
+        "description": "Configuration now works with both '.screenshot_format' and '.screenshot.format' patterns"
+      },
+      {
+        "feature": "Robust fallbacks", 
+        "description": "Every config value has sensible defaults preventing application crashes"
+      },
+      {
+        "feature": "Dependency validation",
+        "description": "Runtime check for grim, slurp, wf-recorder, ffmpeg, yq with helpful installation hints"
+      },
+      {
+        "feature": "Optional tool detection",
+        "description": "Checks for optimization tools only when optimize_by_default is enabled"
+      }
+    ],
+
+    "config_mappings": [
+      "screenshot_format -> screenshot_format // screenshot.format // 'png'",
+      "max_threads -> max_threads // performance.max_threads // 4", 
+      "debug_enabled -> debug_enabled // debug.enabled // false",
+      "notifications_enabled -> notifications_enabled // notifications.enabled // true",
+      "ffmpeg_codec -> ffmpeg_codec // ffmpeg.codec // 'libx264'",
+      "temp_directory -> temp_directory // performance.temp_directory // '/tmp/hyprsnap'"
+    ],
+
+    "testing_notes": [
+      "Test with repository config.yaml using nested structure",
+      "Test with legacy flat config structure",
+      "Test missing config file creation",
+      "Test dependency check warnings when tools missing",
+      "Verify all config variables properly exported and accessible"
+    ],
+
+    "backward_compatibility": {
+      "breaking_changes": "None - supports both old flat and new nested configurations",
+      "migration_path": "Existing configs continue to work; new nested format preferred"
+    },
+
+    "risk_assessment": {
+      "risk_level": "low",
+      "concerns": [
+        "Dependency warnings might be verbose on systems missing optional tools"
+      ],
+      "mitigations": [
+        "Optional tools only warned when optimization enabled",
+        "Clear installation instructions provided"
+      ]
+    },
+
+    "metadata": {
+      "files_modified": 1,
+      "lines_changed": 95,
+      "functions_added": 1,
+      "config_keys_enhanced": 10,
+      "dependencies_checked": ["grim", "slurp", "wf-recorder", "ffmpeg", "imagemagick", "yq", "optipng", "jpegoptim", "cwebp"],
+      "estimated_impact": "High - resolves config compatibility and prevents runtime failures"
+    }
+  }
+}

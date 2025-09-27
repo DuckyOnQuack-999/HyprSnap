@@ -1,0 +1,32 @@
+{
+  "changeset_id": "fix-004-cross-compositor-screenshot",
+  "timestamp": "2025-01-10T21:05:00Z",
+  "confidence": 0.88,
+  "category": "shell_modernization",
+  "description": "Add cross-compositor geometry detection for screenshots and window capture",
+  "files_modified": [
+    {
+      "path": "core/screenshot.sh",
+      "lines_changed": [54, 66],
+      "change_type": "logic_improvement",
+      "reason": "Replaced hardcoded swaymsg window geometry detection with intelligent compositor detection supporting Hyprland, Sway, and generic Wayland fallbacks."
+    }
+  ],
+  "issues_addressed": [
+    "Hardcoded swaymsg-only window geometry detection excludes Hyprland users",
+    "No fallback mechanism for unsupported or missing compositors",
+    "Window screenshots fail on non-Sway Wayland environments",
+    "Lack of cross-compositor compatibility in geometry calculation"
+  ],
+  "improvements": [
+    "Added Hyprland support using hyprctl activewindow with proper JSON parsing",
+    "Maintained Sway compatibility with existing swaymsg approach",
+    "Implemented interactive slurp fallback for unknown or missing compositors",
+    "Enhanced error resilience for window capture across different environments",
+    "Used command -v for robust binary detection instead of hardcoded assumptions",
+    "Consistent geometry format parsing: X,Y WIDTHxHEIGHT for all compositors"
+  ],
+  "risk_assessment": "low",
+  "testing_required": true,
+  "rollback_notes": "Can revert to original swaymsg-only approach by restoring single geometry detection line"
+}
